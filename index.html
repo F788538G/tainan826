@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 TAINAN 老中青府城慢活之旅</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#C0243E">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="台南之旅">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <style>
+        /* 1. 基礎變數與重設 */
+        :root {
+            --tainan-red: #C0243E;
+            --weather-blue: #4A90E2;
+            --milkfish-bg: #F9F9F2;        
+            --text-black: #000000;
+            --content-max-width: 460px;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background-color: var(--milkfish-bg);
+            font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+            overflow: hidden;
+            color: var(--text-black);
+        }
+
+        /* 2. 應用程式外框層級 */
+        .app-container {
+            position: relative; height: 100%; width: 100%;
+            max-width: 500px; margin: 0 auto;
+            background: var(--milkfish-bg);
+            display: flex; flex-direction: column;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        .page {
+            display: none; flex-direction: column; height: 100%; width: 100%;
+            position: absolute; top: 0; left: 0; background: var(--milkfish-bg);
+            padding-bottom: 70px; 
+        }
+        .page.active { display: flex; z-index: 10; }
+
+        /* 3. 置頂標題區 (Top Bar) */
+        .top-bar { 
+            padding: 10px 20px;
+            background: white; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            width: 100%;
+            text-align: center;
+            z-index: 30;
+        }
+        .trip-info h1 { margin: 0; font-size: 1.4rem; letter-spacing: 5px; font-weight: bold; color: var(--tainan-red); }
+        .trip-info p { margin: 4px 0 0; font-size: 0.9rem; color: var(--text-black); font-weight: 500; }
+
+        /* 4. 固定日期捲軸區與漸層效果 */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 25;
+            background: var(--milkfish-bg);
+        }
+
+        .date-scroller-container {
+            position: relative;
+            background: white;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .date-scroller-container::after {
+            content: "";
+            position: absolute;
+            bottom: -25px;
+            left: 0;
+            width: 100%;
+            height: 25px;
+            background: linear-gradient(to bottom, white 0%, rgba(249, 249, 242, 0) 100%);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .date-scroller { 
+            display: flex; 
+            padding: 12px 10px; 
+            gap: 8px; 
+            overflow-x: auto; 
+            background: white; 
+            justify-content: center; /* 關鍵：置中排列 */
+            scrollbar-width: none;
+        }
+        .date-scroller::-webkit-scrollbar { display: none; }
+
+        .date-item {
+            flex: 1; /* 關鍵：平分寬度 */
+            max-width: 100px; /* 限制最大寬度以維持美觀 */
+            min-width: 85px; /* 統一最小寬度 */
+            height: 50px; background: white; border-radius: 12px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; cursor: pointer;
+            flex-shrink: 0;
+        }
+        .date-item span { color: var(--text-black); }
+        .date-item.active { background: var(--tainan-red); border: none; }
+        .date-item.active span { color: #FFFFFF !important; } 
+        .date-item span:first-child { font-size: 0.7rem; margin-bottom: 1px; opacity: 0.8; }
+        .date-item span:last-child { font-size: 1.1rem; font-weight: 900; }
+
+        /* 5. 主要內容滾動區 (Content) */
+        .content { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 20px 20px; 
+            width: 100%;
+            max-width: var(--content-max-width); 
+            margin: 0 auto; 
+            scrollbar-width: none;
+        }
+        .content::-webkit-scrollbar { display: none; }
+
+        /* 天氣卡片 */
+        .weather-card {
+            background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+            border-radius: 50px; padding: 10px 25px;
+            margin: 0px 0 20px 0; position: relative;
+            box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+        }
+        .weather-card * { color: #FFFFFF !important; } 
+        .temp { font-size: 1.8rem; font-weight: bold; }
+
+        /* 行程項目卡片 */
+        .itinerary-item {
+            background: white; border-radius: 18px; padding: 20px;
+            margin-bottom: 15px; display: flex; gap: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.03); border: 1px solid #f0f0f0;
+            width: 100%; 
+        }
+        
+        .itinerary-time { 
+            font-weight: 900; 
+            font-size: 1.2rem; 
+            min-width: 65px; 
+            color: var(--tainan-red); 
+            text-shadow: 1px 1px 2px rgba(192, 36, 62, 0.15);
+        } 
+        .itinerary-detail h4 { margin: 0 0 8px; font-size: 1.1rem; color: var(--text-black); }
+        .itinerary-detail p { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text-black); }
+
+        #page-info .itinerary-detail h4 {
+            color: #C0243E; 
+        }
+
+        .itinerary-img {
+            width: 100%; max-height: 250px; object-fit: cover;
+            border-radius: 12px; margin-top: 12px; margin-bottom: 5px; display: block;
+        }
+
+        .map-link {
+            display: inline-block; margin-top: 10px; padding: 4px 10px;
+            background-color: var(--tainan-red); 
+            color: #FFFFFF !important;
+            text-decoration: none; border-radius: 50px; font-size: 0.9rem; font-weight: bold;
+        }
+
+        /* 倒數與資訊頁面居中樣式 */
+        .page-centered-content { display: flex; align-items: center; justify-content: center; }
+
+        .countdown-container {
+            width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 50px;
+        }
+        .countdown-box {
+            background: white; border-radius: 30px; padding: 50px 30px; width: 100%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #eee; text-align: center;
+        }
+        .countdown-number { font-size: 4.5rem; font-weight: 900; margin: 10px 0; color: var(--tainan-red); text-shadow: 2px 2px 4px rgba(0,0,0,0.05); }
+        .countdown-unit { font-size: 1.2rem; font-weight: bold; color: var(--text-black); opacity: 0.7; letter-spacing: 2px; }
+
+        /* 6. 底部導覽列 (Nav Bar) */
+        .nav-bar {
+            position: absolute; bottom: 0; width: 100%; height: 70px;
+            background: white; display: flex; justify-content: space-around;
+            align-items: center; border-top: 1px solid #eee; z-index: 100;
+        }
+        .nav-item { display: flex; flex-direction: column; align-items: center; opacity: 0.4; font-size: 0.7rem; cursor: pointer; flex: 1; color: var(--text-black); }
+        .nav-item.active { opacity: 1; font-weight: bold; color: var(--tainan-red); }
+        .nav-icon { font-size: 1.3rem; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    
+    <div id="page-schedule" class="page active">
+        <div class="top-bar">
+            <div class="trip-info">
+                <h1>T A I N A N</h1>
+                <p>台南FUN暑假！老中青府城樂活漫遊</p>
+            </div>
+        </div>
+
+        <div class="sticky-header">
+            <div class="date-scroller-container">
+                <div class="date-scroller">
+                    <div class="date-item active" onclick="switchDay(1, this)"><span>第一天</span><span>8/12</span></div>
+                    <div class="date-item" onclick="switchDay(2, this)"><span>第二天</span><span>8/13</span></div>
+                    <div class="date-item" onclick="switchDay('2-rain', this)"><span>第二天雨備</span><span>8/13</span></div>
+                    <div class="date-item" onclick="switchDay(3, this)"><span>第三天</span><span>8/14</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="weather-display">
+                <div class="weather-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div><span style="font-size: 0.9rem; opacity: 0.9; margin-right: 10px;">中西區</span><span style="font-size: 1.2rem; font-weight: bold;">晴朗炎熱 ☀️</span></div>
+                        <div class="temp">32°</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="itinerary-content"></div>
+        </div>
+    </div>
+
+    <div id="page-info" class="page">
+        <div class="top-bar">
+            <div class="trip-info"><h1>T A I N A N</h1><p>台南FUN暑假！老中青府城樂活漫遊</p></div>
+        </div>
+        <div class="content page-centered-content">
+            <div class="itinerary-item">
+                <div class="itinerary-detail">
+                    <h4>煙波大飯店台南館</h4>
+                    <p>地址：台南市中西區府前路一段 269 號<br>電話：06-215-6000</p><br>
+                    <p>入住：2026年8月12日星期三 15:00起</p>
+                    <p>退房：2026年8月14日星期五 至11:00</p><br>
+                    <p>經典一大床</p>
+                    <p>床型選項: 雙人特大床 – 180 x 200</p>
+                    <p>含早餐: 自助式早餐</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-countdown" class="page">
+        <div class="top-bar">
+            <div class="trip-info"><h1>T A I N A N</h1><p>台南FUN暑假！老中青府城樂活漫遊</p></div>
+        </div>
+        <div class="content page-centered-content">
+            <div class="countdown-container">
+                <div class="countdown-box">
+                    <div class="countdown-unit">距離出發還有</div>
+                    <div id="days-count" class="countdown-number">--</div>
+                    <div class="countdown-unit">DAYS</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-item active" onclick="showNav('page-schedule', this)">
+            <span class="nav-icon">📅</span><span>當日行程</span>
+        </div>
+        <div class="nav-item" onclick="showNav('page-info', this)">
+            <span class="nav-icon">🏠</span><span>住宿資訊</span>
+        </div>
+        <div class="nav-item" onclick="showNav('page-countdown', this)">
+            <span class="nav-icon">⏳</span><span>倒數天數</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showNav(pageId, element) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        element.classList.add('active');
+        if(pageId === 'page-countdown') calculateCountdown();
+    }
+
+    function calculateCountdown() {
+        const targetDate = new Date('2026/08/12');
+        const diffDays = Math.ceil((targetDate - new Date()) / (1000 * 60 * 60 * 24));
+        document.getElementById('days-count').innerText = diffDays > 0 ? diffDays : 0;
+    }
+
+    // ── 即時天氣（Open-Meteo，免 API key）──────────────────────
+    const WMO_MAP = {
+      0:'晴天 ☀️', 1:'晴時多雲 🌤️', 2:'多雲 ⛅', 3:'陰天 ☁️',
+      45:'霧 🌫️', 48:'霧 🌫️',
+      51:'毛毛雨 🌦️', 53:'毛毛雨 🌦️', 55:'毛毛雨 🌦️',
+      61:'小雨 🌧️', 63:'中雨 🌧️', 65:'大雨 🌧️',
+      80:'陣雨 🌧️', 81:'陣雨 🌧️', 82:'大陣雨 ⛈️',
+      95:'雷雨 ⛈️', 96:'雷雨夾冰雹 ⛈️', 99:'雷雨夾冰雹 ⛈️',
+    };
+
+    async function fetchWeather(lat, lon, locationName) {
+      const el = document.getElementById('weather-display');
+      el.innerHTML = `<div class="weather-card"><div style="opacity:0.85">載入天氣中…</div></div>`;
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,relative_humidity_2m&timezone=Asia%2FTaipei`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const cur = data.current;
+        const temp = Math.round(cur.temperature_2m);
+        const desc = WMO_MAP[cur.weathercode] || '天氣資料更新中';
+        const humi = cur.relative_humidity_2m;
+        el.innerHTML = `
+          <div class="weather-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <span style="font-size:0.9rem;opacity:0.9;margin-right:10px;">${locationName}</span>
+                <span style="font-size:1.2rem;font-weight:bold;">${desc}</span>
+                <div style="font-size:0.8rem;opacity:0.8;margin-top:4px;">濕度 ${humi}%　即時天氣</div>
+              </div>
+              <div class="temp">${temp}°</div>
+            </div>
+          </div>`;
+      } catch(e) {
+        el.innerHTML = `<div class="weather-card"><div>天氣載入失敗，請檢查網路</div></div>`;
+      }
+    }
+
+    const DAY_WEATHER = {
+      1:        { lat: 22.9908, lon: 120.2133, name: '台南中西區' },
+      2:        { lat: 23.1167, lon: 120.1833, name: '台南北門區' },
+      '2-rain': { lat: 22.9417, lon: 120.2211, name: '台南仁德區' },
+      3:        { lat: 22.9908, lon: 120.2133, name: '台南中西區' },
+    };
+
+    function switchDay(day, el) {
+        document.querySelectorAll('.date-item').forEach(item => item.classList.remove('active'));
+        if (el) el.classList.add('active');
+
+        const w = DAY_WEATHER[day];
+        if (w) fetchWeather(w.lat, w.lon, w.name);
+
+        const content = document.getElementById('itinerary-content');
+
+        if(day === 2) {
+            content.innerHTML = `
+                <div class="itinerary-item"><div class="itinerary-time">08:00</div><div class="itinerary-detail"><h4>飯店早餐</h4>
+                    <img src="https://tainan.lakeshore.com.tw/wp-content/uploads/sites/22/2023/12/dining-area-gruel-800x600.jpg" class="itinerary-img">
+                </div></div>
+
+                <div class="itinerary-item"><div class="itinerary-time">10:00</div><div class="itinerary-detail"><h4>出發前往鹹味十足的百年小鎮</h4></div></div>
+
+                <div class="itinerary-item">
+                    <div class="itinerary-time">11:00</div>
+                    <div class="itinerary-detail">
+                        <h4>虱目魚小子</h4>
+                        <p>被國外媒體報導的台南之光-虱目魚小子，有大眼、濃眉、紅唇的人偶，帶著虱目魚頭的頭套，醜萌的樣子更是登上國際版面，成為台南遊客打卡景點。</p>
+                        <img src="https://s.yimg.com/ny/api/res/1.2/RrmBMUP.0QW3VOsAMCQDwQ--/YXBwaWQ9aGlnaGxhbmRlcjt3PTk2MDtoPTcyMA--/https://media.zenfs.com/ko/chinatimes_newspapers_146/9d580ad5952727733c8302ceaa5eb614" class="itinerary-img">
+                        <p>📷臨停在路邊拍照請注意安全。</p>
+                        <a href="javascript:void(0)" onclick="openMaps('虱目魚小子')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>
+                <div class="itinerary-item"><div class="itinerary-time">12:00</div><div class="itinerary-detail"><h4>北門井仔腳興安宮</h4><p>超過兩百年的歷史，供奉紀府千歲守護鹽田和當地民眾，被在地民眾尊稱為鹽王爺，廟方打造一尊2.5公尺的鹽雕鹽王爺，記得打卡拍照！</p>
+                    <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjH4Ko0SPArjBFXd-5TqJ_YUko0M23Ta9oR5hDaifEG7iE5y1YroHk3CeqSNL61TxnsGVgIPI2ZPbRLRubmBqSs7uA8WJu2JaZoaUtGlPqguhp0IHmEizZN0-_BVKPeKc-pRKFZs1HGpOWsZ4YARFry12_D5b-Fwu2EBzilNEMbEa-hlc_iG7szS4xh/w640-h428/DSC_1258.JPG" class="itinerary-img">
+                    <p>🚗興安宮旁廣場 or 後方空地可停車。</p><a href="javascript:void(0)" onclick="openMaps('北門井仔腳興安宮')" class="map-link">開啟地圖導航</a>
+                </div></div>
+                <div class="itinerary-item"><div class="itinerary-time"> </div><div class="itinerary-detail"><h4>午餐：興安宮廣場小吃店</h4></div></div> 
+                <div class="itinerary-item"><div class="itinerary-time"> </div><div class="itinerary-detail"><h4>井仔腳瓦盤鹽田</h4><p>台灣36秘境之一，北門的第一座鹽田，也是現存最古老的瓦盤鹽田遺址，至今已有200年歷史。</p>
+                    <img src="https://www.twtainan.net/content/images/attractions/33108/1920x1080_Filedata635654840284948587.jpg" class="itinerary-img">
+                </div></div>
+                <div class="itinerary-item"><div class="itinerary-time">17:00</div><div class="itinerary-detail"><h4>回程</h4></div></div>
+                <div class="itinerary-item">
+                    <div class="itinerary-time">18:30</div>
+                    <div class="itinerary-detail">
+                        <h4>晚餐：正宗媽煮妙小吃</h4>
+                        <p>位在安南區小漁村裡，是老饕口中才知道的隱藏版餐廳，每天現撈漁船上岸的海鮮直接端上桌，吃得到最原始的鮮甜。</p>
+                        <img src="https://peanutwalker.com/wp-content/uploads/20191106195933_91.jpg" class="itinerary-img">
+
+                        <a href="javascript:void(0)" onclick="openMaps('正宗媽煮妙小吃')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>`;
+        } else if(day === '2-rain') {
+            content.innerHTML = `
+                <div class="itinerary-item"><div class="itinerary-time">08:00</div><div class="itinerary-detail"><h4>飯店早餐</h4>
+                    <img src="https://tainan.lakeshore.com.tw/wp-content/uploads/sites/22/2023/12/dining-area-gruel-800x600.jpg" class="itinerary-img">
+                </div></div>
+
+
+                <div class="itinerary-item">
+                    <div class="itinerary-time">09:00</div>
+                    <div class="itinerary-detail">
+                        <h4>奇美食品幸福工廠</h4>
+                        <p>從原物料開始，探索奇美食品幸福工廠的秘密。館內展示具可看性的實體文物、生動有趣的圖文說明，搭配多樣好玩的互動體驗。</p>
+                        <img src="https://www.twtainan.net/content/images/attractions/48191/1920x1080_Filedata636444568973453665.jpg" class="itinerary-img">
+                        <a href="javascript:void(0)" onclick="openMaps('奇美食品幸福工廠')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>
+
+
+                <div class="itinerary-item">
+                    <div class="itinerary-time">12:00</div>
+                    <div class="itinerary-detail">
+                        <h4>MITSUI OUTLET PARK 台南</h4>
+                        <p>南台灣休閒購物與旅遊新地標。</p>
+                        <img src="https://hips.hearstapps.com/hmg-prod/images/%E8%A5%BF%E5%90%91-%E5%85%A5%E5%8F%A3-1641965463.jpg?crop=1xw:1xh;center,top" class="itinerary-img">
+                        <a href="javascript:void(0)" onclick="openMaps('MITSUI OUTLET PARK 台南')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>
+
+
+                <div class="itinerary-item">
+                    <div class="itinerary-time">12:00</div>
+                    <div class="itinerary-detail">
+                        <h4>午餐：點點心 或 涮乃葉</h4>
+                        <p>1️⃣點點心：知名港式點心專門店，以「創意」與「功夫」為核心，融合傳統與現代口味，主打現點現做。</p>
+                        <a href="https://inline.app/booking/-Kxqm7v374WKKvottI_6/-OaO7iIWFf_Mux4o_yE5" target="_blank" class="map-link">開啟餐廳訂位</a></br></br>
+                        <p>2️⃣涮乃葉：堅持提供精選肉品、新鮮蔬菜、絕品湯底、特調醬料，物超所值的日式涮涮鍋吃到飽專門店。 </p>
+                        <a href="https://inline.app/booking/-LPimPrzunBVFBi0ckJB:inline-live-2a466/-Mx8pCj-G6GufiF36yM4" target="_blank" class="map-link">開啟餐廳訂位</a>
+                    </div>
+                </div>
+
+                <div class="itinerary-item">
+                    <div class="itinerary-time">16:00</div>
+                    <div class="itinerary-detail">
+                        <h4>回程</h4>
+                        <p>順路外帶懷舊小棧杏仁豆腐冰，台南五妃廟美食，內行人必吃！如果有停車格下車內用也OK👍</p>
+                        <img src="https://curly.com.tw/wp-content/uploads/2022/08/P1288790.jpg" class="itinerary-img">
+                        <a href="javascript:void(0)" onclick="openMaps('懷舊小棧杏仁豆腐冰')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>
+
+                <div class="itinerary-item">
+                    <div class="itinerary-time">18:00</div>
+                    <div class="itinerary-detail">
+                        <h4>阿財牛肉湯 西門x保安店</h4>
+                    <p>台南煙波走路6分鐘，有店貓可以嚕。</p>
+                    <img src="https://pic.pimg.tw/niceclaup313/1763470985-1184242104-g_n.jpg" class="itinerary-img">
+                    <a href="javascript:void(0)" onclick="openMaps('阿財牛肉湯 西門x保安店')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>
+
+
+
+</div>`;
+        } else if(day === 3) {
+            content.innerHTML = `
+                <div class="itinerary-item"><div class="itinerary-time">09:00</div><div class="itinerary-detail"><h4>飯店早餐</h4></div></div>
+                <div class="itinerary-item"><div class="itinerary-time">10:00</div><div class="itinerary-detail"><h4>☕跑咖：杏源珈琲Sing yuan coffee</h4><p>博鈞昕芸去外帶喔，要喝請喊聲！</p>
+                    <img src="https://live.staticflickr.com/65535/55210920664_53a8f42507_b.jpg" class="itinerary-img">
+                    <p>從煙波步行5分鐘，藏在小西門圓環巷弄裡的杏源珈琲，前身是老中藥行。</p>
+                    <a href="javascript:void(0)" onclick="openMaps('杏源珈琲')" class="map-link">開啟地圖導航</a>
+                </div></div>
+
+                <div class="itinerary-item"><div class="itinerary-time">11:00</div><div class="itinerary-detail"><h4>辦理退房</h4></div></div>
+
+                <div class="itinerary-item">
+                    <div class="itinerary-time">12:00</div>
+                    <div class="itinerary-detail">
+                        <h4>午餐：信義小吃部 炒鱔魚專家</h4>
+                        <img src="https://letsplay.tw/wp-content/uploads/2022/12/1P6A3304.jpg" class="itinerary-img">
+                        <p>車子可停以下兩個停車場：</p>
+                        <p>1️⃣嘟嘟房停車場-台南大同站(走路5分鐘)</p>
+                        <a href="javascript:void(0)" onclick="openMaps('701臺南市東區大同路一段307號後方空地(嘟嘟房停車')" class="map-link">開啟地圖導航</a></br></br>
+                        <p style="margin-top:10px;">2️⃣府連停車場(走路1分鐘)</p>
+                        <a href="javascript:void(0)" onclick="openMaps('701臺南市東區大同路一段197巷18號')" class="map-link">開啟地圖導航</a>
+                </div></div>
+
+                <div class="itinerary-item"><div class="itinerary-time">13:00</div><div class="itinerary-detail"><h4>旅途圓滿，平安賦歸</h4></div></div>`;
+        } else {
+            content.innerHTML = `
+                <div class="itinerary-item">
+                    <div class="itinerary-time">15:00</div>
+                    <div class="itinerary-detail">
+                        <h4>煙波大飯店台南館 CHECK IN</h4>
+                        <p>坐落於台南市中心精華地段，館內設有露天泳池、三溫暖與健身房設施，步行即可達孔廟商圈、國華街、神農街、正興街等古蹟景點與美食據點。</p>
+                        <img src="https://dynamic-media-cdn.tripadvisor.com/media/photo-o/19/30/83/2a/getlstd-property-photo.jpg?w=1400&h=800&s=1" class="itinerary-img">
+                        <a href="javascript:void(0)" onclick="openMaps('煙波大飯店台南館')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>
+                <div class="itinerary-item">
+                    <div class="itinerary-time">16:20</div>
+                    <div class="itinerary-detail">
+                        <h4>安平運河遊船</h4>
+                        <p>「金色流域線」全程約45-60分鐘，金色夕陽下飽覽港灣風光與城市燈光，行經 6 座低橋墩，體驗獨特夜航風情。</p>
+                        <img src="https://www.twtainan.net/content/images/shops/103056/1024x768_shops-image-bcobemjjc0utyvpkzjyima.jpg" class="itinerary-img">
+                        <p>⛵乘船地點：立驛國際安平遊港遊運河，車請停在此處。</p>
+                        <a href="javascript:void(0)" onclick="openMaps('立驛國際安平遊港遊運河')" class="map-link">開啟地圖導航</a>
+                    </div>
+                </div>
+                <div class="itinerary-item">
+                    <div class="itinerary-time">18:30</div>
+                    <div class="itinerary-detail"><h4>晚餐：3皇3家 或 二牛牛肉湯</h4>
+<p>1️⃣3皇3家 億載店：離運河港口走路8分鐘。</p>
+<p>台南在地老品牌，火鍋、簡餐或輕食餐點豐富多元，還有依季節性推出的新菜色，是不少在地人用餐小聚的好所在。</p>
+                    <img src="https://decing.tw/wp-content/uploads/thumb_20200711142531_70.jpg" class="itinerary-img">
+                    <a href="javascript:void(0)" onclick="openMaps('3皇3家 億載店')" class="map-link">開啟地圖導航</a></br></br>
+                    <p>2️⃣二牛牛肉湯：有特約停車場。每日限量的溫體牛五花肉湯、經典清爽的牛肉湯，每碗都能免費續湯，湯頭鮮甜回甘。</p>
+                    <img src="https://www.masterpon.com/wp-content/uploads/2019/02/twocattles17.jpg" class="itinerary-img">
+                    <a href="javascript:void(0)" onclick="openMaps('二牛牛肉湯')" class="map-link">開啟地圖導航</a></div></div>
+
+
+
+
+                </div>`;
+        }
+        document.querySelector('.content').scrollTop = 0;
+    }
+    
+    switchDay(1, document.querySelector('.date-item.active'));
+    fetchWeather(22.9908, 120.2133, '台南中西區');
+    calculateCountdown();
+
+    function openMaps(query) {
+        const encoded = encodeURIComponent(query);
+        // 用 search?api=1&query= 格式，這是 Google Maps 官方的 URL scheme
+        // 能確保直接跳到地標而不是搜尋結果頁
+        const url = `https://www.google.com/maps/search/?api=1&query=${encoded}`;
+        const a = document.createElement('a');
+        a.href = url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+
+</body>
+</html>
